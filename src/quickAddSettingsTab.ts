@@ -187,7 +187,7 @@ export class QuickAddSettingsTab extends PluginSettingTab {
 			items: [
 				{
 					name: "Use Multi-line Input Prompt",
-					desc: "Use multi-line input prompt instead of single-line input prompt",
+					desc: "Use multi-line input prompt instead of single-line input prompt. Submit multi-line prompts with Ctrl/Cmd+Enter; Enter inserts a newline.",
 					control: { type: "toggle", key: "inputPrompt" },
 				},
 				{
@@ -201,8 +201,8 @@ export class QuickAddSettingsTab extends PluginSettingTab {
 					control: { type: "toggle", key: "useSelectionAsCaptureValue" },
 				},
 				{
-					name: "One-page input for choices (Beta)",
-					desc: "Experimental. Resolve variables up front and show a single dynamic form before executing Template/Capture choices. See Advanced → One-page Inputs in docs.",
+					name: "One-page input for choices",
+					desc: "Collect a choice's inputs in one form before it runs, instead of one prompt at a time. Works with Template and Capture choices, and with Macros whose scripts declare inputs. Template and Capture choices can override this individually. See One-page Inputs in the docs.",
 					control: { type: "toggle", key: "onePageInputEnabled" },
 				},
 				{

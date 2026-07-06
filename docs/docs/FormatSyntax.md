@@ -164,7 +164,7 @@ Example:
 {{VALUE:summary|type:multiline|label:Summary}}
 ```
 
-**Keyboard:** In the multi-line prompt, pressing **Tab** inserts a tab character at the cursor (handy for nested Markdown lists) instead of moving focus; with text selected, Tab indents every line the selection touches. **Shift+Tab** is left unbound, so it still moves focus out of the field.
+**Keyboard:** Submit the multi-line prompt with **Ctrl/Cmd+Enter** - plain **Enter** inserts a newline. Pressing **Tab** inserts a tab character at the cursor (handy for nested Markdown lists) instead of moving focus; with text selected, Tab indents every line the selection touches. **Shift+Tab** is left unbound, so it still moves focus out of the field. See [Controlling Prompts](./ControllingPrompts.md#submit-keys) for all prompt shortcuts.
 
 ## `{{VALUE:<variable>|type:number}}` / `|type:slider` / `|type:checkbox` / `|type:text` {#value-property-types}
 
@@ -268,7 +268,7 @@ Notes:
 
 ## Optional fields: `|optional` {#optional-fields}
 
-Marks a prompt as optional, so it can be skipped and resolve to nothing. Works on `{{VALUE}}`/`{{NAME}}`, `{{VALUE:<variable>}}`, option lists, and `{{VDATE:...}}`.
+Marks a prompt as optional, so it can be skipped and resolve to nothing. Works on `{{VALUE}}`/`{{NAME}}`, `{{VALUE:<variable>}}`, option lists, `{{VDATE:...}}`, and `{{FILE:...}}`.
 
 ```markdown
 {{VALUE:reminder|optional}}
@@ -365,7 +365,7 @@ Example: `{{GLOBAL_VAR:Meeting Header}}`.
 
 ## `{{MVALUE}}` {#mvalue}
 
-Math modal for writing LaTeX. Use CTRL + Enter to submit.
+Math modal for writing LaTeX. Use Ctrl/Cmd + Enter to submit.
 
 Example: `Equation: ${{MVALUE}}$`.
 

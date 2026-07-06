@@ -6,6 +6,7 @@ import type IChoice from "src/types/choices/IChoice";
 import type ITemplateChoice from "src/types/choices/ITemplateChoice";
 import { VALUE_SYNTAX } from "src/constants";
 import { MacroAbortError } from "src/errors/MacroAbortError";
+import { log } from "src/logger/logManager";
 import { OnePageInputModal } from "./OnePageInputModal";
 import {
 	canonicalizeOnePageFileValue,
@@ -235,7 +236,20 @@ export async function runOnePagePreflight(
 		if (error === "cancelled" || error instanceof MacroAbortError) {
 			throw error;
 		}
-		// For other errors, silently fail and continue
+		// Any other error degrades to the sequential runtime prompts. That
+		// fallback is safe, but it must not be silent: a regression here would
+		// otherwise disable the one-page form for a choice shape with no trace
+		// (and if the form was already submitted, the user gets re-asked).
+		// Remote runs are exempt: session teardown rejects the pending form with
+		// a plain Error, and "falling back to step-by-step prompts" would mislead
+		// there - the session error already surfaces to the remote client.
+		if (!choiceExecutor.promptProvider) {
+			log.logWarning(
+				`One-page input failed for choice "${choice.name}"; falling back to step-by-step prompts: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
 		return false;
 	}
 }
