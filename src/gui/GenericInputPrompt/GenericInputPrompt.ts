@@ -5,6 +5,8 @@ import { TagSuggester } from "../suggesters/tagSuggester";
 import { InputPromptDraftHandler } from "../../utils/InputPromptDraftHandler";
 import type { InputPromptOptions } from "../../types/inputPrompt";
 import { positionInputPromptCursor } from "../inputPromptCursor";
+import type { ImagePasteHandle } from "../imagePasteHandler";
+import { attachImagePasteHandler } from "../imagePasteHandler";
 
 /**
  * The keyboard gesture that skips an optional prompt: ctrl/cmd+shift+Enter.
@@ -27,6 +29,7 @@ export default class GenericInputPrompt extends Modal {
 	private resolvePromise: (input: string) => void;
 	private rejectPromise: (reason?: unknown) => void;
 	private didSubmit = false;
+	private didClose = false;
 	protected inputComponent: TextComponent;
 	protected input: string;
 	private readonly placeholder: string;
@@ -34,6 +37,7 @@ export default class GenericInputPrompt extends Modal {
 	private readonly description?: string;
 	private fileSuggester: FileSuggester;
 	private tagSuggester: TagSuggester;
+	private imagePasteHandle?: ImagePasteHandle;
 
 	public static Prompt(
 		app: App,
@@ -163,6 +167,14 @@ export default class GenericInputPrompt extends Modal {
 			.onChange((value) => this.onInputChanged(value))
 			.inputEl.addEventListener("keydown", this.submitEnterCallback);
 
+		if (this.options?.imagePaste) {
+			this.imagePasteHandle = attachImagePasteHandler(
+				this.app,
+				textComponent.inputEl,
+				this.options.imagePaste,
+			);
+		}
+
 		return textComponent;
 	}
 
@@ -236,6 +248,16 @@ export default class GenericInputPrompt extends Modal {
 	}
 
 	private submit() {
+		// didClose guards the deferred path below: cancel/Esc while a paste
+		// save is in flight must not let the queued submit fire on the closed
+		// modal (re-resolving the rejected promise, double onClose).
+		if (this.didSubmit || this.didClose) return;
+		// A pasted image may still be saving; defer so Ctrl+V-then-Enter
+		// submits WITH the embed link instead of racing the save.
+		if (this.imagePasteHandle?.isBusy()) {
+			void this.imagePasteHandle.whenIdle().then(() => this.submit());
+			return;
+		}
 		const rawInput = this.inputComponent?.inputEl?.value ?? this.input;
 		this.input = this.transformInputOnSubmit(rawInput);
 		this.didSubmit = true;
@@ -284,6 +306,7 @@ export default class GenericInputPrompt extends Modal {
 			"keydown",
 			this.submitEnterCallback
 		);
+		this.imagePasteHandle?.detach();
 	}
 
 	onOpen() {
@@ -293,6 +316,7 @@ export default class GenericInputPrompt extends Modal {
 	}
 
 	onClose() {
+		this.didClose = true;
 		if (!this.didSubmit) {
 			this.syncInputFromEl();
 		}

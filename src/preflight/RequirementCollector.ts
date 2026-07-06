@@ -4,6 +4,8 @@ import {
 	FIELD_VARIABLE_PREFIX,
 	FILE_REGEX,
 	GLOBAL_VAR_REGEX,
+	MATH_VALUE_REGEX,
+	NAME_VALUE_REGEX,
 	TEMPLATE_REGEX,
 	VARIABLE_REGEX,
 } from "src/constants";
@@ -57,6 +59,14 @@ export interface FieldRequirement {
 	multiEmit?: "text" | "linklist"; // |multi:linklist wraps picks as [[name]]
 	filters?: string; // serialized filters for FIELD variables
 	source?: "collected" | "script"; // provenance for UX badges
+	/**
+	 * True when ANY scanned occurrence of the variable sits in a path-context
+	 * string (file name format, folder path, capture target, insert-after/
+	 * before targets, template path). Sticky: one path usage disables
+	 * image paste for the field - an embed link in a path would corrupt it
+	 * (issue #1484). Content-only fields stay unset.
+	 */
+	pathContext?: boolean;
 	/** Prompt at runtime instead of the one-page form when the form has no safe widget. */
 	runtimeOnly?: boolean;
 	/** True only when EVERY scanned occurrence of the variable is |optional. */
@@ -78,11 +88,14 @@ export class RequirementCollector extends Formatter {
 	public readonly requirements = new Map<string, FieldRequirement>();
 	public readonly templatesToScan = new Set<string>();
 	/**
-	 * Cross-branch memo for the template-inclusion walk: template ref → the
-	 * shallowest depth it was fully scanned at during this collection.
-	 * Requirements dedupe by id, so re-scanning a template reachable through
-	 * many distinct paths adds nothing - without this memo a dense template
-	 * DAG fans out as branching^depth (~1M scans at 4×10), freezing the UI.
+	 * Cross-branch memo for the template-inclusion walk: `<context>:<ref>`
+	 * (context = "path" | "content") → the shallowest depth the template was
+	 * fully scanned at during this collection. Requirements dedupe by id, so
+	 * re-scanning a template reachable through many distinct paths adds
+	 * nothing - without this memo a dense template DAG fans out as
+	 * branching^depth (~1M scans at 4×10), freezing the UI. Keyed per context
+	 * because a content-scanned template reached again from a path string
+	 * must be re-walked to taint its variables as path context (#1484).
 	 */
 	public readonly scannedTemplateRefDepths = new Map<string, number>();
 
@@ -101,15 +114,48 @@ export class RequirementCollector extends Formatter {
 		}
 	}
 
+	/**
+	 * True while the current scanString walks a path-context string. Flows
+	 * into FieldRequirement.pathContext (sticky across occurrences).
+	 */
+	private scanningPathContext = false;
+
 	// Entry points -------------------------------------------------------------
-	public async scanString(input: string): Promise<void> {
-		// Expand global variables first so we can detect inner requirements
-		const expanded = await this.replaceGlobalVarInString(input);
-		// Run a safe formatting pass that collects variables but avoids side-effects
-		this.scanVariableTokens(expanded);
-		this.scanDateTokens(expanded);
-		this.scanFileTokens(expanded);
-		await this.format(expanded);
+	public async scanString(input: string, pathContext = false): Promise<void> {
+		const previousContext = this.scanningPathContext;
+		this.scanningPathContext = pathContext;
+		try {
+			// Expand global variables first so we can detect inner requirements
+			const expanded = await this.replaceGlobalVarInString(input);
+			// Run a safe formatting pass that collects variables but avoids side-effects
+			this.scanVariableTokens(expanded);
+			this.scanDateTokens(expanded);
+			this.scanFileTokens(expanded);
+			// Anonymous {{VALUE}}/{{NAME}} and {{MVALUE}} resolutions are
+			// cached, so their prompt hooks fire once per collector; a path
+			// string scanned AFTER a content string that already registered
+			// them must still taint them (named variables get per-occurrence
+			// marking in scanVariableTokens; these singleton tokens need this
+			// textual re-check).
+			if (pathContext) {
+				if (new RegExp(NAME_VALUE_REGEX.source, "i").test(expanded)) {
+					const anonymousValue = this.requirements.get("value");
+					if (anonymousValue) anonymousValue.pathContext = true;
+				}
+				if (new RegExp(MATH_VALUE_REGEX.source, "i").test(expanded)) {
+					const mathValue = this.requirements.get("mvalue");
+					if (mathValue) mathValue.pathContext = true;
+				}
+			}
+			await this.format(expanded);
+		} finally {
+			this.scanningPathContext = previousContext;
+		}
+	}
+
+	/** Sticky path-context marking: one path occurrence taints the field. */
+	private markScanContext(req: FieldRequirement): void {
+		if (this.scanningPathContext) req.pathContext = true;
 	}
 
 	protected async format(input: string): Promise<string> {
@@ -237,9 +283,11 @@ export class RequirementCollector extends Formatter {
 					req.sliderConfig = parsed.sliderConfig;
 				}
 				if (defaultValue) req.defaultValue = defaultValue;
+				this.markScanContext(req);
 				this.requirements.set(requirementId, req);
 			} else {
 				const existing = this.requirements.get(requirementId)!;
+				this.markScanContext(existing);
 				// Order-independent named reuse: when a later occurrence carries
 				// the option list ({{VALUE:a,b|name:x}}) but the requirement was
 				// first recorded option-less (a bare {{VALUE:x}} reuse seen
@@ -404,6 +452,12 @@ export class RequirementCollector extends Formatter {
 				optional: this.valuePromptContext?.optional,
 			});
 		}
+		// This hook fires once per collector ({{VALUE}} resolution is cached),
+		// but path strings are always scanned before content strings by the
+		// per-choice collectors, so a dual-use anonymous VALUE is first seen -
+		// and marked - in path context. The sticky mark below also covers the
+		// already-registered case for safety.
+		this.markScanContext(this.requirements.get(key)!);
 		return ""; // return inert value to keep scanning
 	}
 
@@ -466,6 +520,7 @@ export class RequirementCollector extends Formatter {
 			if (context?.defaultValue) req.defaultValue = context.defaultValue;
 			this.requirements.set(key, req);
 		}
+		this.markScanContext(this.requirements.get(key)!);
 
 		return context?.defaultValue ?? "";
 	}
@@ -480,6 +535,10 @@ export class RequirementCollector extends Formatter {
 				placeholder: "e.g., 2+2*3",
 			});
 		}
+		// {{MVALUE}} is legal in path strings too; taint like the VALUE hooks
+		// so its free-text field never offers image paste there (#1484). This
+		// hook fires once per collector, but path strings are scanned first.
+		this.markScanContext(this.requirements.get(key)!);
 		return "";
 	}
 
