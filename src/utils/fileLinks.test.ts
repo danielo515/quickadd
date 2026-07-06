@@ -159,6 +159,123 @@ describe("file link helpers", () => {
 		).toBe("[[Created Note]]");
 	});
 
+	describe("selection-derived aliases", () => {
+		function createAliasApp({ useMarkdownLinks = false } = {}): App {
+			return {
+				fileManager: {
+					generateMarkdownLink: vi.fn(
+						(
+							file: TFile,
+							_sourcePath: string,
+							_subpath?: string,
+							alias?: string,
+						) =>
+							alias === undefined
+								? `[[${file.basename}]]`
+								: `[[${file.basename}|${alias}]]`,
+					),
+				},
+				metadataCache: {
+					fileToLinktext: vi.fn(() => "Created Note"),
+				},
+				vault: {
+					getConfig: vi.fn((key: string) =>
+						key === "useMarkdownLinks" ? useMarkdownLinks : undefined,
+					),
+				},
+			} as unknown as App;
+		}
+
+		function generatedAlias(app: App): string | undefined {
+			const call = vi.mocked(app.fileManager.generateMarkdownLink).mock
+				.calls[0];
+			return call.length > 2 ? (call[3] as string | undefined) : undefined;
+		}
+
+		function buildWithAlias(app: App, alias: string): string {
+			return buildFileLinkText(app, createFile(), {
+				sourcePath: "Daily.md",
+				linkType: "link",
+				placement: "replaceSelection",
+				alias,
+			});
+		}
+
+		it("passes safe selection text through as the alias", () => {
+			const app = createAliasApp();
+			expect(buildWithAlias(app, "Meeting with Mark")).toBe(
+				"[[Created Note|Meeting with Mark]]",
+			);
+		});
+
+		it("collapses newline runs to a single space and trims", () => {
+			const app = createAliasApp();
+			buildWithAlias(app, "  first line \r\n\n  second line\n");
+			expect(generatedAlias(app)).toBe("first line second line");
+		});
+
+		it("omits the alias entirely for empty and whitespace-only selections", () => {
+			for (const raw of ["", "   ", "\n\n", " \r\n "]) {
+				const app = createAliasApp();
+				buildWithAlias(app, raw);
+				expect(generatedAlias(app)).toBeUndefined();
+				expect(app.fileManager.generateMarkdownLink).toHaveBeenCalledWith(
+					createFile(),
+					"Daily.md",
+				);
+			}
+		});
+
+		it("keeps single brackets and pipes in wiki aliases (safe per Obsidian's parser)", () => {
+			for (const safe of ["array[0] end", "a] b", "open [ bracket", "a|b"]) {
+				const app = createAliasApp();
+				buildWithAlias(app, safe);
+				expect(generatedAlias(app)).toBe(safe);
+			}
+		});
+
+		it("drops unrepresentable wiki aliases instead of mutating the text", () => {
+			// "]]" terminates the wikilink early; "[[" starts a nested link that
+			// hijacks the outer target; a trailing "]" forms "]]" with the closer.
+			for (const hostile of [
+				"a]]b",
+				"see [[Other]] ref",
+				"array[0]",
+				"trail ]",
+			]) {
+				const app = createAliasApp();
+				buildWithAlias(app, hostile);
+				expect(generatedAlias(app)).toBeUndefined();
+			}
+		});
+
+		it("escapes backslashes and brackets for markdown-link vaults", () => {
+			const cases: Array<[string, string]> = [
+				["a [x] b", "a \\[x\\] b"],
+				["C:\\path\\", "C:\\\\path\\\\"],
+				["a\\]b", "a\\\\\\]b"],
+				["array[0]", "array\\[0\\]"],
+			];
+			for (const [raw, escaped] of cases) {
+				const app = createAliasApp({ useMarkdownLinks: true });
+				buildWithAlias(app, raw);
+				expect(generatedAlias(app)).toBe(escaped);
+			}
+		});
+
+		it("ignores the alias for embeds", () => {
+			const app = createAliasApp();
+			const text = buildFileLinkText(app, createFile(), {
+				sourcePath: "Daily.md",
+				linkType: "embed",
+				placement: "replaceSelection",
+				alias: "Meeting with Mark",
+			});
+			expect(text).toBe("![[Created Note]]");
+			expect(app.fileManager.generateMarkdownLink).not.toHaveBeenCalled();
+		});
+	});
+
 	it("returns false when clipboard writes are unavailable", async () => {
 		vi.stubGlobal("navigator", {});
 
@@ -290,4 +407,64 @@ describe("file link helpers", () => {
 			),
 		).rejects.toThrow("Append link target file not found");
 	});
+});
+
+describe("prepareLinkAlias whitespace handling (via buildFileLinkText)", () => {
+	function createWikiApp(): App {
+		return {
+			fileManager: {
+				generateMarkdownLink: vi.fn(
+					(
+						file: TFile,
+						_sourcePath: string,
+						_subpath?: string,
+						alias?: string,
+					) =>
+						alias === undefined
+							? `[[${file.basename}]]`
+							: `[[${file.basename}|${alias}]]`,
+				),
+			},
+			metadataCache: { fileToLinktext: vi.fn(() => "Created Note") },
+			vault: { getConfig: vi.fn(() => false) },
+		} as unknown as App;
+	}
+
+	function aliasFor(raw: string): string {
+		const app = createWikiApp();
+		const file = {
+			basename: "Created Note",
+			path: "Projects/Created Note.md",
+		} as TFile;
+		return buildFileLinkText(app, file, {
+			sourcePath: "Daily.md",
+			linkType: "link",
+			alias: raw,
+		});
+	}
+
+	it("collapses CRLF/CR/LF runs with surrounding spaces to one space", () => {
+		expect(aliasFor("a  \r\n\t b")).toBe("[[Created Note|a b]]");
+		expect(aliasFor("a\rb\nc")).toBe("[[Created Note|a b c]]");
+	});
+
+	it("keeps interior horizontal whitespace runs intact", () => {
+		expect(aliasFor("a  \t  b")).toBe("[[Created Note|a  \t  b]]");
+	});
+
+	it(
+		"handles a long newline-free horizontal-whitespace run in linear time",
+		() => {
+			// Opener-flood ReDoS shape (#1444/#1455/#1462): a long run of spaces
+			// with no newline must not backtrack quadratically.
+			const input = `a${" ".repeat(200_000)}b`;
+			const start = performance.now();
+			const result = aliasFor(input);
+			const elapsed = performance.now() - start;
+
+			expect(result).toBe(`[[Created Note|${input}]]`);
+			expect(elapsed).toBeLessThan(1_000);
+		},
+		20_000,
+	);
 });
