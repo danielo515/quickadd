@@ -13,6 +13,7 @@ import {
 	getCurrentFileLinkPreview,
 	getCurrentFileLinkToSectionPreview,
 	getCurrentFileNamePreview,
+	getCurrentFolderPathPreview,
 	DateFormatPreviewGenerator
 } from "./helpers/previewHelpers";
 import { getValueVariableBaseName } from "../utils/valueSyntax";
@@ -25,6 +26,13 @@ export class FormatDisplayFormatter extends Formatter {
 		app: App,
 		private readonly plugin: QuickAdd,
 		dateParser?: IDateParser,
+		// Line-target fields (insert-after/before) preview with
+		// { resolveActiveFolder: false }: their runtime path
+		// (formatLocationString) deliberately leaves {{foldercurrent}} literal,
+		// so the preview must too — otherwise a manually typed or imported
+		// selector previews as a resolved folder while the capture searches for
+		// the literal token.
+		private readonly opts: { resolveActiveFolder?: boolean } = {},
 	) {
 		super(app);
 		this.dateParser = dateParser || NLDParser;
@@ -47,13 +55,17 @@ export class FormatDisplayFormatter extends Formatter {
 			output = await this.replaceClipboardInString(output);
 			output = await this.replaceDateVariableInString(output);
 			output = await this.replaceVariableInString(output);
-			// Links + {{filenamecurrent}} + {{folder}} in one pass so no token
-			// re-scans another's output (#1358). ({{title}} has never been resolved
-			// in this preview formatter — preserved by omitting it.)
+			// Links + {{filenamecurrent}} + {{folder}} + {{foldercurrent}} in one
+			// pass so no token re-scans another's output (#1358). ({{title}} has
+			// never been resolved in this preview formatter — preserved by omitting
+			// it.) The preview resolver never returns null, so no throw here.
 			output = this.replaceCurrentFileTokensInString(output, {
 				links: true,
 				fileName: true,
 				folder: true,
+				...(this.opts.resolveActiveFolder === false
+					? {}
+					: { activeFolder: "content" as const }),
 			});
 			output = await this.replaceMacrosInString(output);
 			output = await this.replaceTemplateInString(output);
@@ -110,6 +122,11 @@ export class FormatDisplayFormatter extends Formatter {
 	protected getCurrentFileName(): string | null {
 		if (!this.app) return "current_filename";
 		return getCurrentFileNamePreview(this.app.workspace.getActiveFile());
+	}
+
+	protected getCurrentFolderPath(): string | null {
+		if (!this.app) return "current_folder";
+		return getCurrentFolderPathPreview(this.app.workspace.getActiveFile());
 	}
 
 	protected suggestForValue(

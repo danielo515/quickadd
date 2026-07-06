@@ -119,12 +119,15 @@ export class CompleteFormatter extends Formatter {
 				"{{title}} cannot be used in file names as it would create a circular dependency. The title is derived from the filename itself.",
 			);
 		}
-		// {{filenamecurrent}} + {{folder}} in one pass (links stay literal in a
-		// file name; {{title}} threw above). One pass so no token re-scans
-		// another's output (#1358).
+		// {{filenamecurrent}} + {{folder}} + {{foldercurrent}} in one pass (links
+		// stay literal in a file name; {{title}} threw above). One pass so no token
+		// re-scans another's output (#1358). activeFolder is "path": this entry
+		// point produces file paths (file names AND capture targets), where a
+		// missing active file must abort rather than strip to a root-level path.
 		output = this.replaceCurrentFileTokensInString(output, {
 			fileName: true,
 			folder: true,
+			activeFolder: "path",
 		});
 		return output;
 	}
@@ -134,13 +137,17 @@ export class CompleteFormatter extends Formatter {
 
 		output = await this.format(output);
 		// Resolve ALL note-derived tokens ({{linkcurrent}}, {{linksection}},
-		// {{filenamecurrent}}, {{folder}}, {{title}}) in ONE pass so no token
-		// re-scans another's generated output — fixing both the cross-pass
-		// corruption and the infinite loop a token-named file/title caused (#1358).
+		// {{filenamecurrent}}, {{folder}}, {{foldercurrent}}, {{title}}) in ONE
+		// pass so no token re-scans another's generated output — fixing both the
+		// cross-pass corruption and the infinite loop a token-named file/title
+		// caused (#1358). activeFolder is "content": in a note body an unresolved
+		// token cannot misplace data, so it follows the same required/optional
+		// contract as the link/file-name tokens.
 		output = this.replaceCurrentFileTokensInString(output, {
 			links: true,
 			fileName: true,
 			folder: true,
+			activeFolder: "content",
 			title: true,
 		});
 
@@ -169,9 +176,22 @@ export class CompleteFormatter extends Formatter {
 		// {{FOLDER}} in a folder definition is self-referential: the target
 		// folder isn't known while folders are being resolved, so it collapses
 		// to an empty string rather than leaking the literal token into a path.
-		return this.replaceCurrentFileTokensInString(formatted, {
+		// {{FOLDERCURRENT}} is NOT self-referential (the active file's folder is
+		// known here) and must resolve: left verbatim it would be threaded into
+		// getOrCreateFolder and CREATE a vault folder literally named
+		// "{{foldercurrent}}". "path" mode: no active file aborts with a clear
+		// error instead of silently collapsing the folder to the vault root.
+		const resolved = this.replaceCurrentFileTokensInString(formatted, {
 			folder: true,
+			activeFolder: "path",
 		});
+		// A token that legitimately resolves to "" at the START of the path (a
+		// root-level active file in "{{FOLDERCURRENT}}/Subnotes", or the {{FOLDER}}
+		// collapse above) leaves a leading "/", which validateFolderPath would
+		// reject as an empty first segment — falling back to the vault root
+		// instead of using "Subnotes". Strip leading slashes so the folder path is
+		// root-relative, matching what the capture/file-name paths do downstream.
+		return resolved.replace(/^\/+/, "");
 	}
 
 	/**
@@ -182,8 +202,8 @@ export class CompleteFormatter extends Formatter {
 	 * tokens, but never runs macros, inline JavaScript, or {{TEMPLATE:}}
 	 * inclusion — a file-path lookup should not execute code or splice another
 	 * template's body into a path. Note-relative tokens ({{title}}, {{FOLDER}},
-	 * {{FILENAMECURRENT}}, {{LINKCURRENT}}, {{LINKSECTION}}) are intentionally
-	 * left literal: a
+	 * {{FOLDERCURRENT}}, {{FILENAMECURRENT}}, {{LINKCURRENT}}, {{LINKSECTION}})
+	 * are intentionally left literal: a
 	 * source template has no "current note" or target folder, so an unresolved
 	 * token fails visibly instead of silently collapsing the path.
 	 *
@@ -249,10 +269,11 @@ export class CompleteFormatter extends Formatter {
 	protected async formatLocationString(input: string): Promise<string> {
 		let output = await this.format(input);
 		// Links + {{filenamecurrent}} + {{title}} in one pass so no token re-scans
-		// another's output (#1358). {{FOLDER}} is deliberately left literal in
-		// location selectors (insert-after/before targets) — an empty resolution
-		// would match the first line, and folder reflection isn't meaningful for a
-		// line target.
+		// another's output (#1358). {{FOLDER}} and {{FOLDERCURRENT}} are
+		// deliberately left literal in location selectors (insert-after/before
+		// targets) — both can legitimately resolve to an empty string ("" target
+		// folder / root-level active file), and an empty selector would match the
+		// first line. Tokens that are nonempty-or-throw (links, file name) stay.
 		output = this.replaceCurrentFileTokensInString(output, {
 			links: true,
 			fileName: true,
@@ -276,6 +297,21 @@ export class CompleteFormatter extends Formatter {
 		if (!currentFile) return null;
 
 		return currentFile.basename;
+	}
+
+	/**
+	 * {{foldercurrent}}: the active file's parent folder, vault-relative with no
+	 * trailing slash. Obsidian's root TFolder has path "/", which collapses to ""
+	 * (matching setTargetFolderPath) so a root-level note yields a root-relative
+	 * sibling path instead of a literal leading "/". Uses the LIVE active file,
+	 * byte-consistent with getCurrentFileName/getCurrentFileLink.
+	 */
+	protected getCurrentFolderPath(): string | null {
+		const currentFile = this.app.workspace.getActiveFile();
+		if (!currentFile) return null;
+
+		const parentPath = currentFile.parent?.path ?? "";
+		return parentPath === "/" ? "" : parentPath;
 	}
 
 	/**
