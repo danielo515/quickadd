@@ -86,8 +86,8 @@ importers:
         specifier: 1.13.1
         version: 1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)
       obsidian-e2e:
-        specifier: ^0.8.2
-        version: 0.8.2(vite-plus@0.1.24(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(jiti@2.6.1)(jsdom@29.1.1)(svelte@5.56.4(@typescript-eslint/types@8.63.0))(typescript@6.0.3)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.6.1)(yaml@2.9.0))(yaml@2.9.0))(vitest@4.1.10)
+        specifier: ^0.9.0
+        version: 0.9.0(vite-plus@0.1.24(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(jiti@2.6.1)(jsdom@29.1.1)(svelte@5.56.4(@typescript-eslint/types@8.63.0))(typescript@6.0.3)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.6.1)(yaml@2.9.0))(yaml@2.9.0))(vitest@4.1.10)
       svelte:
         specifier: ^5
         version: 5.56.4(@typescript-eslint/types@8.63.0)
@@ -1752,6 +1752,11 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  nanoid@3.3.16:
+    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
+    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
+    hasBin: true
+
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
@@ -1765,8 +1770,8 @@ packages:
   obsidian-dataview@0.5.68:
     resolution: {integrity: sha512-eoYVxqgeAUM64fV6/YXWuXvmm9DaVoR1h/O+vBIHS0yQ+n9x5MaVndD3WjcVWuaJmrMM9iwvutkbZ0aCWpLmHw==}
 
-  obsidian-e2e@0.8.2:
-    resolution: {integrity: sha512-3fWfWJoyjNJVjoD0K+6ohvBOilGCC0BRYwzRLKU4kZ3ZDGW7VUDiTSL46SgnAx/kXCW/teVV1OMw5UcazcXEGQ==}
+  obsidian-e2e@0.9.0:
+    resolution: {integrity: sha512-eolHF8eiwidRmT8JK+KLzv2o28ckKLUvBhwfiz5rfxx5mmbGqaJyNnne8uQ5YaURowX9u7T7Jga1Q6jihUv2eQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -1904,6 +1909,10 @@ packages:
 
   postcss@8.5.16:
     resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
+    engines: {node: ^10 || ^12 || >=14}
+
+  postcss@8.5.18:
+    resolution: {integrity: sha512-xdB1oSLHbz1vRWgCDalrCqEFTWzFlhqFC5tIHLMOSUIjhm3XXQ1qrFy8S/ESr1JYRRXqM3c1QFiMZUJdUTqyMQ==}
     engines: {node: ^10 || ^12 || >=14}
 
   preact@10.29.2:
@@ -3054,7 +3063,7 @@ snapshots:
       '@oxc-project/runtime': 0.133.0
       '@oxc-project/types': 0.133.0
       lightningcss: 1.32.0
-      postcss: 8.5.16
+      postcss: 8.5.18
     optionalDependencies:
       '@types/node': 26.1.1
       esbuild: 0.28.1
@@ -3637,6 +3646,8 @@ snapshots:
 
   nanoid@3.3.15: {}
 
+  nanoid@3.3.16: {}
+
   natural-compare@1.4.0: {}
 
   obsidian-calendar-ui@0.3.12(@codemirror/state@6.6.0)(@codemirror/view@6.43.1)(@typescript-eslint/types@8.63.0):
@@ -3673,7 +3684,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  obsidian-e2e@0.8.2(vite-plus@0.1.24(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(jiti@2.6.1)(jsdom@29.1.1)(svelte@5.56.4(@typescript-eslint/types@8.63.0))(typescript@6.0.3)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.6.1)(yaml@2.9.0))(yaml@2.9.0))(vitest@4.1.10):
+  obsidian-e2e@0.9.0(vite-plus@0.1.24(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(jiti@2.6.1)(jsdom@29.1.1)(svelte@5.56.4(@typescript-eslint/types@8.63.0))(typescript@6.0.3)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.6.1)(yaml@2.9.0))(yaml@2.9.0))(vitest@4.1.10):
     dependencies:
       vite-plus: 0.1.24(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(esbuild@0.28.1)(jiti@2.6.1)(jsdom@29.1.1)(svelte@5.56.4(@typescript-eslint/types@8.63.0))(typescript@6.0.3)(vite@8.1.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.6.1)(yaml@2.9.0))(yaml@2.9.0)
       yaml: 2.9.0
@@ -3825,6 +3836,12 @@ snapshots:
   postcss@8.5.16:
     dependencies:
       nanoid: 3.3.15
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
+  postcss@8.5.18:
+    dependencies:
+      nanoid: 3.3.16
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
