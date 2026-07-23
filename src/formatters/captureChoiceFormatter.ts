@@ -1,4 +1,5 @@
-import { MarkdownView, type TFile } from "obsidian";
+import type { TFile } from "obsidian";
+import { getActiveMarkdownEditorView } from "../utils/activeMarkdownEditor";
 import { getLinesInString } from "src/utility";
 import {
 	CREATE_IF_NOT_FOUND_BOTTOM,
@@ -595,13 +596,15 @@ export class CaptureChoiceFormatter extends CompleteFormatter {
 			this.choice.insertAfter?.createIfNotFoundLocation ===
 			CREATE_IF_NOT_FOUND_CURSOR
 		) {
+			const activeView = getActiveMarkdownEditorView(this.app);
+
+			if (!activeView) {
+				throw new ChoiceAbortError(
+					`Unable to insert line '${this.choice.insertAfter.after}' at cursor position: no active markdown editor.`,
+				);
+			}
+
 			try {
-				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-				if (!activeView) {
-					throw new Error("No active view.");
-				}
-
 				const cursor = activeView.editor.getCursor();
 				let targetPosition = cursor.line;
 
@@ -838,13 +841,15 @@ export class CaptureChoiceFormatter extends CompleteFormatter {
 			insertBefore.createIfNotFoundLocation ===
 			CREATE_IF_NOT_FOUND_CURSOR
 		) {
+			const activeView = getActiveMarkdownEditorView(this.app);
+
+			if (!activeView) {
+				throw new ChoiceAbortError(
+					`Unable to insert line '${insertBefore.before}' at cursor position: no active markdown editor.`,
+				);
+			}
+
 			try {
-				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-				if (!activeView) {
-					throw new Error("No active view.");
-				}
-
 				const cursor = activeView.editor.getCursor();
 
 				return this.insertTextBeforePositionInBody(
@@ -892,13 +897,15 @@ export class CaptureChoiceFormatter extends CompleteFormatter {
 			this.choice.insertAfter?.createIfNotFoundLocation ===
 			CREATE_IF_NOT_FOUND_CURSOR
 		) {
+			const activeView = getActiveMarkdownEditorView(this.app);
+
+			if (!activeView) {
+				throw new ChoiceAbortError(
+					`Unable to insert line '${this.choice.insertAfter.after}' at cursor position: no active markdown editor.`,
+				);
+			}
+
 			try {
-				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-				if (!activeView) {
-					throw new Error("No active view.");
-				}
-
 				const cursor = activeView.editor.getCursor();
 				const targetPosition = cursor.line;
 
